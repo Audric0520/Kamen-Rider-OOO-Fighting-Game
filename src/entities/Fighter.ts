@@ -6,6 +6,8 @@ import {
   FIGHTER_MOVE_SPEED,
   FIGHTER_WIDTH,
   GRAVITY_PER_FRAME,
+  KNOCKBACK_DECAY,
+  KNOCKBACK_STOP_SPEED,
   GROUND_Y,
   HURTBOX_HEIGHT,
   HURTBOX_TOP_OFFSET,
@@ -17,7 +19,7 @@ import {
   type AttackType,
 } from '../config';
 
-export type FighterState = 'IDLE' | 'WALK' | 'JUMP' | 'ATTACK' | 'HITSTUN' | 'KO';
+export type FighterState = 'IDLE' | 'WALK' | 'JUMP' | 'ATTACK' | 'BLOCK' | 'HITSTUN' | 'KO';
 export type FacingDirection = -1 | 1;
 export type AttackPhase = 'startup' | 'active' | 'recovery';
 
@@ -34,6 +36,7 @@ export interface FighterInput {
   jumpPressed: boolean;
   lightAttackPressed: boolean;
   heavyAttackPressed: boolean;
+  blockHeld: boolean;
 }
 
 export class Fighter {
@@ -50,6 +53,7 @@ export class Fighter {
   private attackFrame = 0;
   private attackHitLanded = false;
   private hitstunFramesRemaining = 0;
+  private blockstunFramesRemaining = 0;
 
   public constructor(x: number) {
     this.x = x;
@@ -81,11 +85,28 @@ export class Fighter {
     }
 
     if (this.state === 'HITSTUN') {
+      this.advanceKnockback();
       this.advanceVerticalPhysics();
       this.hitstunFramesRemaining -= 1;
       if (this.hitstunFramesRemaining <= 0) {
+        this.velocityX = 0;
         this.changeState(this.locomotionState());
       }
+      return;
+    }
+
+    if (this.state === 'BLOCK') {
+      this.advanceVerticalPhysics();
+      if (this.blockstunFramesRemaining > 0) {
+        this.blockstunFramesRemaining -= 1;
+        if (this.blockstunFramesRemaining > 0) {
+          return;
+        }
+      }
+      if (input.blockHeld) {
+        return;
+      }
+      this.changeState(this.locomotionState());
       return;
     }
 
@@ -96,6 +117,13 @@ export class Fighter {
         this.currentAttack = null;
         this.changeState(this.locomotionState());
       }
+      return;
+    }
+
+    if (input.blockHeld) {
+      this.velocityX = 0;
+      this.changeState('BLOCK');
+      this.advanceVerticalPhysics();
       return;
     }
 
@@ -120,10 +148,7 @@ export class Fighter {
       this.grounded = false;
     }
 
-    this.x += this.velocityX;
-    const halfWidth = FIGHTER_WIDTH / 2;
-    this.x = Math.max(STAGE_LEFT + halfWidth, Math.min(STAGE_RIGHT - halfWidth, this.x));
-
+    this.advanceHorizontalMovement(this.velocityX);
     this.advanceVerticalPhysics();
 
     if (!this.grounded) {
@@ -197,23 +222,49 @@ export class Fighter {
     return true;
   }
 
-  public receiveHit(damage: number, hitstunFrames: number): void {
+  public receiveHit(
+    damage: number,
+    hitstunFrames: number,
+    knockback: number,
+    knockbackDirection: FacingDirection,
+  ): void {
     if (this.state === 'KO') {
       return;
     }
 
     this.health = Math.max(0, this.health - damage);
-    this.velocityX = 0;
     this.currentAttack = null;
+    this.blockstunFramesRemaining = 0;
 
     if (this.health === 0) {
-      this.changeState('KO');
+      this.velocityX = 0;
       this.velocityY = 0;
+      this.changeState('KO');
       return;
     }
 
+    this.velocityX = knockback * knockbackDirection;
     this.hitstunFramesRemaining = hitstunFrames;
     this.changeState('HITSTUN');
+  }
+
+  public receiveBlockedHit(chipDamage: number, blockstunFrames: number): void {
+    if (this.state === 'KO') {
+      return;
+    }
+
+    this.health = Math.max(0, this.health - chipDamage);
+    this.currentAttack = null;
+    this.velocityX = 0;
+
+    if (this.health === 0) {
+      this.velocityY = 0;
+      this.changeState('KO');
+      return;
+    }
+
+    this.blockstunFramesRemaining = blockstunFrames;
+    this.changeState('BLOCK');
   }
 
   private beginAttack(attackType: AttackType): void {
@@ -244,6 +295,27 @@ export class Fighter {
       this.y = GROUND_Y - FIGHTER_HEIGHT;
       this.velocityY = 0;
       this.grounded = true;
+    }
+  }
+
+  private advanceKnockback(): void {
+    if (this.velocityX === 0) {
+      return;
+    }
+
+    this.advanceHorizontalMovement(this.velocityX);
+    this.velocityX *= KNOCKBACK_DECAY;
+    if (Math.abs(this.velocityX) < KNOCKBACK_STOP_SPEED) {
+      this.velocityX = 0;
+    }
+  }
+
+  private advanceHorizontalMovement(distance: number): void {
+    const halfWidth = FIGHTER_WIDTH / 2;
+    const nextX = this.x + distance;
+    this.x = Math.max(STAGE_LEFT + halfWidth, Math.min(STAGE_RIGHT - halfWidth, nextX));
+    if (this.x !== nextX) {
+      this.velocityX = 0;
     }
   }
 

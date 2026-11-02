@@ -1,3 +1,4 @@
+import { BLOCK_CHIP_DAMAGE_RATIO } from '../config';
 import type { Fighter, CombatBox } from '../entities/Fighter';
 
 /** Resolves one-hit-per-attack melee contacts between the two fighters. */
@@ -18,15 +19,41 @@ export class CombatSystem {
       && !player2.hasLandedHitThisAttack()
       && this.overlaps(player2Hitbox, player1.getHurtbox());
 
-    // Determine both contacts before applying either result so simultaneous trades work.
+    // Determine both contacts and guard results before applying either hit so trades work.
+    const player1Blocked = player1Connects && player2.state === 'BLOCK';
+    const player2Blocked = player2Connects && player1.state === 'BLOCK';
     const player1HitLanded = player1Connects && player1.markAttackHit();
     const player2HitLanded = player2Connects && player2.markAttackHit();
 
     if (player1HitLanded && player1Attack !== null) {
-      player2.receiveHit(player1Attack.damage, player1Attack.hitstunFrames);
+      if (player1Blocked) {
+        player2.receiveBlockedHit(
+          Math.floor(player1Attack.damage * BLOCK_CHIP_DAMAGE_RATIO),
+          player1Attack.blockstunFrames,
+        );
+      } else {
+        player2.receiveHit(
+          player1Attack.damage,
+          player1Attack.hitstunFrames,
+          player1Attack.knockback,
+          player1.facing,
+        );
+      }
     }
     if (player2HitLanded && player2Attack !== null) {
-      player1.receiveHit(player2Attack.damage, player2Attack.hitstunFrames);
+      if (player2Blocked) {
+        player1.receiveBlockedHit(
+          Math.floor(player2Attack.damage * BLOCK_CHIP_DAMAGE_RATIO),
+          player2Attack.blockstunFrames,
+        );
+      } else {
+        player1.receiveHit(
+          player2Attack.damage,
+          player2Attack.hitstunFrames,
+          player2Attack.knockback,
+          player2.facing,
+        );
+      }
     }
 
     return Number(player1HitLanded) + Number(player2HitLanded);

@@ -18,12 +18,14 @@ import {
   KO_FIGHTER_COLOR,
   PLAYER_1_START_X,
   PLAYER_2_START_X,
+  ROUND_CONTINUE_KEY,
   STAGE_LEFT,
   STAGE_RIGHT,
 } from '../config';
 import { Fighter, type CombatBox } from '../entities/Fighter';
 import { CombatSystem } from '../systems/CombatSystem';
 import { InputSystem } from '../systems/InputSystem';
+import { RoundSystem, type RoundWinner } from '../systems/RoundSystem';
 import { Hud } from '../ui/Hud';
 
 const FIGHTER_BODY_COLORS: [number, number] = [0xd946ef, 0x0891b2];
@@ -35,8 +37,10 @@ export class FightScene extends Phaser.Scene {
   private facingMarkers!: [Phaser.GameObjects.Rectangle, Phaser.GameObjects.Rectangle];
   private inputSystem!: InputSystem;
   private combatSystem!: CombatSystem;
+  private roundSystem!: RoundSystem;
   private hud!: Hud;
   private debugKey!: Phaser.Input.Keyboard.Key;
+  private roundContinueKey!: Phaser.Input.Keyboard.Key;
   private debugGraphics!: Phaser.GameObjects.Graphics;
   private accumulator = 0;
   private debugEnabled = false;
@@ -55,10 +59,10 @@ export class FightScene extends Phaser.Scene {
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    this.add.text(GAME_WIDTH / 2, HUD_CONTROLS_Y, 'P1: A / D move, W jump, J / K attack     |     P2: ← / → move, ↑ jump, Numpad 1 / 2 attack', {
+    this.add.text(GAME_WIDTH / 2, HUD_CONTROLS_Y, 'P1: A / D move, W jump, S block, J / K attack   |   P2: ← / → move, ↑ jump, ↓ block, Numpad 1 / 2', {
       color: '#cbd5e1',
       fontFamily: 'Arial, sans-serif',
-      fontSize: '14px',
+      fontSize: '13px',
     }).setOrigin(0.5);
 
     const stage = this.add.graphics();
@@ -70,10 +74,7 @@ export class FightScene extends Phaser.Scene {
     stage.lineBetween(STAGE_LEFT, GROUND_Y, STAGE_LEFT, GAME_HEIGHT - 42);
     stage.lineBetween(STAGE_RIGHT, GROUND_Y, STAGE_RIGHT, GAME_HEIGHT - 42);
 
-    this.fighters = [new Fighter(PLAYER_1_START_X), new Fighter(PLAYER_2_START_X)];
-    this.fighters[0].faceTowards(this.fighters[1].x);
-    this.fighters[1].faceTowards(this.fighters[0].x);
-
+    this.fighters = this.createFighters();
     const player1Visual = this.createFighterVisual(this.fighters[0], 0);
     const player2Visual = this.createFighterVisual(this.fighters[1], 1);
     this.fighterShapes = [player1Visual[0], player2Visual[0]];
@@ -81,15 +82,17 @@ export class FightScene extends Phaser.Scene {
 
     this.inputSystem = new InputSystem(this);
     this.combatSystem = new CombatSystem();
+    this.roundSystem = new RoundSystem();
     this.hud = new Hud(this);
-    this.hud.updateHealth(this.fighters[0].health, this.fighters[1].health);
 
     const keyboard = this.input.keyboard;
     if (!keyboard) {
       throw new Error('Keyboard input is unavailable in this browser.');
     }
     this.debugKey = keyboard.addKey(DEBUG_TOGGLE_KEY);
+    this.roundContinueKey = keyboard.addKey(ROUND_CONTINUE_KEY);
     this.debugGraphics = this.add.graphics();
+    this.updateHud();
     this.syncFighterVisuals();
   }
 
@@ -98,20 +101,40 @@ export class FightScene extends Phaser.Scene {
       this.debugEnabled = !this.debugEnabled;
     }
 
+    const continuePressed = Phaser.Input.Keyboard.JustDown(this.roundContinueKey);
+    if (continuePressed && this.roundSystem.status !== 'playing') {
+      this.continueAfterRound();
+    }
+
     this.accumulator += delta;
 
-    while (this.accumulator >= FIXED_STEP_MS) {
+    while (this.accumulator >= FIXED_STEP_MS && this.roundSystem.status === 'playing') {
       this.fighters[0].update(this.inputSystem.readPlayerInput(1));
       this.fighters[1].update(this.inputSystem.readPlayerInput(2));
       this.fighters[0].faceTowards(this.fighters[1].x);
       this.fighters[1].faceTowards(this.fighters[0].x);
       this.combatSystem.resolve(this.fighters);
+      this.roundSystem.update(this.fighters[0], this.fighters[1]);
       this.accumulator -= FIXED_STEP_MS;
     }
 
-    this.hud.updateHealth(this.fighters[0].health, this.fighters[1].health);
+    if (this.roundSystem.status !== 'playing') {
+      this.accumulator = 0;
+    }
+
+    this.updateHud();
     this.syncFighterVisuals();
     this.drawDebugOverlay();
+  }
+
+  private createFighters(): [Fighter, Fighter] {
+    const fighters: [Fighter, Fighter] = [
+      new Fighter(PLAYER_1_START_X),
+      new Fighter(PLAYER_2_START_X),
+    ];
+    fighters[0].faceTowards(fighters[1].x);
+    fighters[1].faceTowards(fighters[0].x);
+    return fighters;
   }
 
   private createFighterVisual(
@@ -136,6 +159,57 @@ export class FightScene extends Phaser.Scene {
     );
 
     return [body, facingMarker];
+  }
+
+  private continueAfterRound(): void {
+    if (this.roundSystem.status === 'round-end') {
+      this.roundSystem.startNextRound();
+      this.fighters = this.createFighters();
+    } else if (this.roundSystem.status === 'match-end') {
+      this.roundSystem.restartMatch();
+      this.fighters = this.createFighters();
+    }
+  }
+
+  private updateHud(): void {
+    this.hud.updateHealth(this.fighters[0].health, this.fighters[1].health);
+    this.hud.updateTimer(this.roundSystem.remainingFrames);
+    this.hud.updateScore(
+      this.roundSystem.roundNumber,
+      this.roundSystem.player1RoundWins,
+      this.roundSystem.player2RoundWins,
+    );
+
+    if (this.roundSystem.status === 'playing') {
+      this.hud.hideRoundEnd();
+      return;
+    }
+
+    const score = `P1 ${this.roundSystem.player1RoundWins} — ${this.roundSystem.player2RoundWins} P2`;
+    if (this.roundSystem.status === 'round-end') {
+      this.hud.showRoundEnd(
+        this.roundTitle(this.roundSystem.roundWinner, this.roundSystem.roundNumber),
+        `Round score: ${score}`,
+        'Press Enter to start the next round',
+      );
+      return;
+    }
+
+    const matchTitle = this.roundSystem.matchWinner === 'draw'
+      ? 'MATCH DRAW'
+      : `PLAYER ${this.roundSystem.matchWinner} WINS THE MATCH`;
+    this.hud.showRoundEnd(
+      matchTitle,
+      `Final score: ${score}`,
+      'Press Enter to play again',
+    );
+  }
+
+  private roundTitle(winner: RoundWinner | null, roundNumber: number): string {
+    if (winner === 'draw' || winner === null) {
+      return `ROUND ${roundNumber} DRAW`;
+    }
+    return `PLAYER ${winner} WINS ROUND ${roundNumber}`;
   }
 
   private syncFighterVisuals(): void {

@@ -29,7 +29,6 @@ interface BoundPlayerKeys {
 }
 
 export interface PlayerInput extends FighterInput {
-  blockPressed: boolean;
   lightAttackPressed: boolean;
   heavyAttackPressed: boolean;
   specialPressed: boolean;
@@ -60,7 +59,7 @@ export class InputSystem {
       left: keys.left.isDown,
       right: keys.right.isDown,
       jumpPressed: Phaser.Input.Keyboard.JustDown(keys.jump),
-      blockPressed: Phaser.Input.Keyboard.JustDown(keys.block),
+      blockHeld: keys.block.isDown,
       lightAttackPressed: Phaser.Input.Keyboard.JustDown(keys.lightAttack),
       heavyAttackPressed: Phaser.Input.Keyboard.JustDown(keys.heavyAttack),
       specialPressed: Phaser.Input.Keyboard.JustDown(keys.special),

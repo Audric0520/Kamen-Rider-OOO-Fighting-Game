@@ -21,6 +21,16 @@ export const FIGHTER_FACING_MARKER_HEIGHT = 18;
 export const FIGHTER_FACING_MARKER_INSET = 8;
 
 export const MAX_HEALTH = 1000;
+export const SECONDS_PER_MINUTE = 60;
+export const ROUND_DURATION_SECONDS = 120;
+export const ROUND_DURATION_FRAMES = ROUND_DURATION_SECONDS * FIXED_UPDATES_PER_SECOND;
+export const ROUNDS_TO_WIN = 2;
+export const MAX_ROUNDS = 3;
+export const BLOCK_CHIP_DAMAGE_RATIO = 0.1;
+export const KNOCKBACK_DECAY = 0.8;
+export const KNOCKBACK_STOP_SPEED = 0.1;
+export const ROUND_CONTINUE_KEY = 'ENTER';
+
 export const HURTBOX_WIDTH = 42;
 export const HURTBOX_HEIGHT = 88;
 export const HURTBOX_TOP_OFFSET = 12;
@@ -34,6 +44,7 @@ export interface AttackDefinition {
   activeFrames: number;
   recoveryFrames: number;
   hitstunFrames: number;
+  blockstunFrames: number;
   knockback: number;
   hitboxWidth: number;
   hitboxHeight: number;
@@ -47,6 +58,7 @@ export const ATTACKS: Record<AttackType, AttackDefinition> = {
     activeFrames: 3,
     recoveryFrames: 12,
     hitstunFrames: 18,
+    blockstunFrames: 8,
     knockback: 5,
     hitboxWidth: 44,
     hitboxHeight: 34,
@@ -58,6 +70,7 @@ export const ATTACKS: Record<AttackType, AttackDefinition> = {
     activeFrames: 4,
     recoveryFrames: 20,
     hitstunFrames: 28,
+    blockstunFrames: 12,
     knockback: 8,
     hitboxWidth: 64,
     hitboxHeight: 52,
@@ -70,9 +83,19 @@ export const HUD_HEALTH_BAR_WIDTH = 300;
 export const HUD_HEALTH_BAR_HEIGHT = 18;
 export const HUD_HEALTH_BAR_Y = 38;
 export const HUD_LABEL_Y = 14;
-export const HUD_TITLE_Y = 72;
-export const HUD_CONTROLS_Y = 106;
+export const HUD_TIMER_Y = HUD_HEALTH_BAR_Y;
+export const HUD_SCORE_Y = 66;
+export const HUD_TITLE_Y = 94;
+export const HUD_CONTROLS_Y = 126;
 export const HUD_BACKGROUND_COLOR = 0x334155;
+export const ROUND_OVERLAY_COLOR = 0x020617;
+export const ROUND_OVERLAY_ALPHA = 0.82;
+export const ROUND_PANEL_COLOR = 0x1e293b;
+export const ROUND_PANEL_WIDTH = 560;
+export const ROUND_PANEL_HEIGHT = 220;
+export const ROUND_PANEL_TITLE_Y = GAME_HEIGHT / 2 - 56;
+export const ROUND_PANEL_DETAIL_Y = GAME_HEIGHT / 2;
+export const ROUND_PANEL_PROMPT_Y = GAME_HEIGHT / 2 + 58;
 export const PLAYER_1_HEALTH_COLOR = 0x22c55e;
 export const PLAYER_2_HEALTH_COLOR = 0x06b6d4;
 export const KO_FIGHTER_COLOR = 0x475569;
