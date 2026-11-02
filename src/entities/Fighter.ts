@@ -1,5 +1,4 @@
 import {
-  ATTACKS,
   ATTACK_HITBOX_CENTER_Y,
   FIGHTER_HEIGHT,
   FIGHTER_JUMP_SPEED,
@@ -39,6 +38,14 @@ export interface FighterInput {
   blockHeld: boolean;
 }
 
+export interface FighterMedalStats {
+  moveSpeedMultiplier: number;
+  jumpPowerMultiplier: number;
+  attackDamageMultiplier: number;
+  specialDamageMultiplier: number;
+  attacks: Record<AttackType, AttackDefinition>;
+}
+
 export class Fighter {
   public x: number;
   public y: number;
@@ -48,10 +55,15 @@ export class Fighter {
   public facing: FacingDirection = 1;
   public state: FighterState = 'IDLE';
   public health = MAX_HEALTH;
+  public specialDamageMultiplier = 1;
 
   private currentAttack: AttackType | null = null;
+  private attackSet: Record<AttackType, AttackDefinition> | null = null;
+  private moveSpeedMultiplier = 1;
+  private jumpPowerMultiplier = 1;
+  private attackDamageMultiplier = 1;
   private attackFrame = 0;
-  private attackHitLanded = false;
+  private attackHitsLanded = 0;
   private hitstunFramesRemaining = 0;
   private blockstunFramesRemaining = 0;
 
@@ -66,6 +78,14 @@ export class Fighter {
     } else if (targetX > this.x) {
       this.facing = 1;
     }
+  }
+
+  public applyMedalStats(stats: FighterMedalStats): void {
+    this.moveSpeedMultiplier = stats.moveSpeedMultiplier;
+    this.jumpPowerMultiplier = stats.jumpPowerMultiplier;
+    this.attackDamageMultiplier = stats.attackDamageMultiplier;
+    this.specialDamageMultiplier = stats.specialDamageMultiplier;
+    this.attackSet = stats.attacks;
   }
 
   public changeState(nextState: FighterState): void {
@@ -133,7 +153,7 @@ export class Fighter {
         ? 'light'
         : null;
 
-    if (attackType) {
+    if (attackType && this.attackSet !== null) {
       this.beginAttack(attackType);
       this.velocityX = 0;
       this.advanceVerticalPhysics();
@@ -141,10 +161,10 @@ export class Fighter {
     }
 
     const horizontalDirection = Number(input.right) - Number(input.left);
-    this.velocityX = horizontalDirection * FIGHTER_MOVE_SPEED;
+    this.velocityX = horizontalDirection * FIGHTER_MOVE_SPEED * this.moveSpeedMultiplier;
 
     if (this.grounded && input.jumpPressed) {
-      this.velocityY = -FIGHTER_JUMP_SPEED;
+      this.velocityY = -FIGHTER_JUMP_SPEED * this.jumpPowerMultiplier;
       this.grounded = false;
     }
 
@@ -170,17 +190,27 @@ export class Fighter {
   }
 
   public getCurrentAttackDefinition(): AttackDefinition | null {
-    return this.state === 'ATTACK' && this.currentAttack !== null
-      ? ATTACKS[this.currentAttack]
-      : null;
+    const attack = this.getBaseAttackDefinition();
+    if (this.state !== 'ATTACK' || attack === null) {
+      return null;
+    }
+    return {
+      ...attack,
+      damage: Math.floor(
+        Math.round(attack.damage * this.attackDamageMultiplier) / attack.hitCount,
+      ),
+    };
   }
 
   public getAttackPhase(): AttackPhase | null {
-    if (this.state !== 'ATTACK' || this.currentAttack === null) {
+    if (this.state !== 'ATTACK') {
       return null;
     }
 
-    const attack = ATTACKS[this.currentAttack];
+    const attack = this.getBaseAttackDefinition();
+    if (attack === null) {
+      return null;
+    }
     if (this.attackFrame < attack.startupFrames) {
       return 'startup';
     }
@@ -198,9 +228,12 @@ export class Fighter {
       return null;
     }
 
-    const attack = ATTACKS[this.currentAttack];
+    const attack = this.getBaseAttackDefinition();
+    if (attack === null) {
+      return null;
+    }
     const centerX = this.x + this.facing * attack.forwardOffset;
-    const centerY = this.y + ATTACK_HITBOX_CENTER_Y;
+    const centerY = this.y + ATTACK_HITBOX_CENTER_Y + attack.hitboxOffsetY;
     return {
       x: centerX - attack.hitboxWidth / 2,
       y: centerY - attack.hitboxHeight / 2,
@@ -209,16 +242,20 @@ export class Fighter {
     };
   }
 
-  public hasLandedHitThisAttack(): boolean {
-    return this.attackHitLanded;
+  public canLandHitThisAttack(): boolean {
+    const attack = this.getBaseAttackDefinition();
+    return this.state === 'ATTACK'
+      && this.getAttackPhase() === 'active'
+      && attack !== null
+      && this.attackHitsLanded < attack.hitCount;
   }
 
   public markAttackHit(): boolean {
-    if (this.state !== 'ATTACK' || this.getAttackPhase() !== 'active' || this.attackHitLanded) {
+    if (!this.canLandHitThisAttack()) {
       return false;
     }
 
-    this.attackHitLanded = true;
+    this.attackHitsLanded += 1;
     return true;
   }
 
@@ -270,17 +307,22 @@ export class Fighter {
   private beginAttack(attackType: AttackType): void {
     this.currentAttack = attackType;
     this.attackFrame = 0;
-    this.attackHitLanded = false;
+    this.attackHitsLanded = 0;
     this.changeState('ATTACK');
   }
 
-  private attackDuration(): number {
-    if (this.currentAttack === null) {
-      return 0;
+  private getBaseAttackDefinition(): AttackDefinition | null {
+    if (this.currentAttack === null || this.attackSet === null) {
+      return null;
     }
+    return this.attackSet[this.currentAttack];
+  }
 
-    const attack = ATTACKS[this.currentAttack];
-    return attack.startupFrames + attack.activeFrames + attack.recoveryFrames;
+  private attackDuration(): number {
+    const attack = this.getBaseAttackDefinition();
+    return attack === null
+      ? 0
+      : attack.startupFrames + attack.activeFrames + attack.recoveryFrames;
   }
 
   private advanceVerticalPhysics(): void {

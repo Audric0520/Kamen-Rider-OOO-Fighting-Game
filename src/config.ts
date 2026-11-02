@@ -45,38 +45,13 @@ export interface AttackDefinition {
   recoveryFrames: number;
   hitstunFrames: number;
   blockstunFrames: number;
+  hitCount: number;
   knockback: number;
   hitboxWidth: number;
   hitboxHeight: number;
   forwardOffset: number;
+  hitboxOffsetY: number;
 }
-
-export const ATTACKS: Record<AttackType, AttackDefinition> = {
-  light: {
-    damage: 60,
-    startupFrames: 6,
-    activeFrames: 3,
-    recoveryFrames: 12,
-    hitstunFrames: 18,
-    blockstunFrames: 8,
-    knockback: 5,
-    hitboxWidth: 44,
-    hitboxHeight: 34,
-    forwardOffset: 38,
-  },
-  heavy: {
-    damage: 120,
-    startupFrames: 12,
-    activeFrames: 4,
-    recoveryFrames: 20,
-    hitstunFrames: 28,
-    blockstunFrames: 12,
-    knockback: 8,
-    hitboxWidth: 64,
-    hitboxHeight: 52,
-    forwardOffset: 46,
-  },
-};
 
 export const HUD_MARGIN = 32;
 export const HUD_HEALTH_BAR_WIDTH = 300;

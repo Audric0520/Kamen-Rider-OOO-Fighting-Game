@@ -12,11 +12,11 @@ export class CombatSystem {
 
     const player1Connects = player1Attack !== null
       && player1Hitbox !== null
-      && !player1.hasLandedHitThisAttack()
+      && player1.canLandHitThisAttack()
       && this.overlaps(player1Hitbox, player2.getHurtbox());
     const player2Connects = player2Attack !== null
       && player2Hitbox !== null
-      && !player2.hasLandedHitThisAttack()
+      && player2.canLandHitThisAttack()
       && this.overlaps(player2Hitbox, player1.getHurtbox());
 
     // Determine both contacts and guard results before applying either hit so trades work.

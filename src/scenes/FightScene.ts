@@ -25,6 +25,7 @@ import {
 import { Fighter, type CombatBox } from '../entities/Fighter';
 import { CombatSystem } from '../systems/CombatSystem';
 import { InputSystem } from '../systems/InputSystem';
+import { MedalSystem } from '../systems/MedalSystem';
 import { RoundSystem, type RoundWinner } from '../systems/RoundSystem';
 import { Hud } from '../ui/Hud';
 
@@ -37,6 +38,7 @@ export class FightScene extends Phaser.Scene {
   private facingMarkers!: [Phaser.GameObjects.Rectangle, Phaser.GameObjects.Rectangle];
   private inputSystem!: InputSystem;
   private combatSystem!: CombatSystem;
+  private medalSystem!: MedalSystem;
   private roundSystem!: RoundSystem;
   private hud!: Hud;
   private debugKey!: Phaser.Input.Keyboard.Key;
@@ -74,6 +76,7 @@ export class FightScene extends Phaser.Scene {
     stage.lineBetween(STAGE_LEFT, GROUND_Y, STAGE_LEFT, GAME_HEIGHT - 42);
     stage.lineBetween(STAGE_RIGHT, GROUND_Y, STAGE_RIGHT, GAME_HEIGHT - 42);
 
+    this.medalSystem = new MedalSystem();
     this.fighters = this.createFighters();
     const player1Visual = this.createFighterVisual(this.fighters[0], 0);
     const player2Visual = this.createFighterVisual(this.fighters[1], 1);
@@ -132,6 +135,7 @@ export class FightScene extends Phaser.Scene {
       new Fighter(PLAYER_1_START_X),
       new Fighter(PLAYER_2_START_X),
     ];
+    fighters.forEach((fighter) => this.medalSystem.initializeFighter(fighter));
     fighters[0].faceTowards(fighters[1].x);
     fighters[1].faceTowards(fighters[0].x);
     return fighters;
