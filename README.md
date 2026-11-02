@@ -9,7 +9,7 @@ npm install
 npm run dev
 ```
 
-Open the local URL printed by Vite. Player 1 moves with **A / D** and jumps with **W**. Player 2 moves with **Left / Right Arrow** and jumps with **Up Arrow**. Each fighter is bounded by the stage walls, falls under gravity, and automatically faces the other fighter. The remaining controls are mapped in `src/config.ts` for later slices; attacks, blocking, and medal swapping are not implemented yet.
+Open the local URL printed by Vite. Player 1 moves with **A / D**, jumps with **W**, and uses **J / K** for light / heavy attacks. Player 2 moves with **Left / Right Arrow**, jumps with **Up Arrow**, and uses **Numpad 1 / 2** for light / heavy attacks. Fighters have health bars, are bounded by the stage walls, fall under gravity, and automatically face each other. Press **F1** to toggle hurtbox and active-hitbox debug outlines. Blocking, medal swapping, rounds, and knockback are reserved for later slices.
 
 ## Verify a production build
 
