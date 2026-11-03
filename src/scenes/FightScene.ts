@@ -24,9 +24,10 @@ import {
 } from '../config';
 import { Fighter, type CombatBox } from '../entities/Fighter';
 import { CombatSystem } from '../systems/CombatSystem';
-import { InputSystem } from '../systems/InputSystem';
+import { InputSystem, type PlayerInput } from '../systems/InputSystem';
+import { MedalSystem, type MedalSlot } from '../systems/MedalSystem';
 import { RoundSystem, type RoundWinner } from '../systems/RoundSystem';
-import { Hud } from '../ui/Hud';
+import { Hud, type MedalSlotStatus } from '../ui/Hud';
 
 const FIGHTER_BODY_COLORS: [number, number] = [0xd946ef, 0x0891b2];
 const FIGHTER_MARKER_COLORS: [number, number] = [0xf5d0fe, 0xa5f3fc];
@@ -37,6 +38,7 @@ export class FightScene extends Phaser.Scene {
   private facingMarkers!: [Phaser.GameObjects.Rectangle, Phaser.GameObjects.Rectangle];
   private inputSystem!: InputSystem;
   private combatSystem!: CombatSystem;
+  private medalSystem!: MedalSystem;
   private roundSystem!: RoundSystem;
   private hud!: Hud;
   private debugKey!: Phaser.Input.Keyboard.Key;
@@ -59,10 +61,10 @@ export class FightScene extends Phaser.Scene {
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    this.add.text(GAME_WIDTH / 2, HUD_CONTROLS_Y, 'P1: A / D move, W jump, S block, J / K attack   |   P2: ← / → move, ↑ jump, ↓ block, Numpad 1 / 2', {
+    this.add.text(GAME_WIDTH / 2, HUD_CONTROLS_Y, 'P1: A / D move, W jump, S block, J / K attack, U / I / O swap   |   P2: arrows move, Down block, Numpad 1 / 2 attack, 4 / 5 / 6 swap', {
       color: '#cbd5e1',
       fontFamily: 'Arial, sans-serif',
-      fontSize: '13px',
+      fontSize: '12px',
     }).setOrigin(0.5);
 
     const stage = this.add.graphics();
@@ -74,6 +76,7 @@ export class FightScene extends Phaser.Scene {
     stage.lineBetween(STAGE_LEFT, GROUND_Y, STAGE_LEFT, GAME_HEIGHT - 42);
     stage.lineBetween(STAGE_RIGHT, GROUND_Y, STAGE_RIGHT, GAME_HEIGHT - 42);
 
+    this.medalSystem = new MedalSystem();
     this.fighters = this.createFighters();
     const player1Visual = this.createFighterVisual(this.fighters[0], 0);
     const player2Visual = this.createFighterVisual(this.fighters[1], 1);
@@ -109,8 +112,14 @@ export class FightScene extends Phaser.Scene {
     this.accumulator += delta;
 
     while (this.accumulator >= FIXED_STEP_MS && this.roundSystem.status === 'playing') {
-      this.fighters[0].update(this.inputSystem.readPlayerInput(1));
-      this.fighters[1].update(this.inputSystem.readPlayerInput(2));
+      this.medalSystem.advanceCooldowns(this.fighters[0]);
+      this.medalSystem.advanceCooldowns(this.fighters[1]);
+      const player1Input = this.inputSystem.readPlayerInput(1);
+      const player2Input = this.inputSystem.readPlayerInput(2);
+      this.fighters[0].update(player1Input);
+      this.fighters[1].update(player2Input);
+      this.processSwapInput(this.fighters[0], player1Input);
+      this.processSwapInput(this.fighters[1], player2Input);
       this.fighters[0].faceTowards(this.fighters[1].x);
       this.fighters[1].faceTowards(this.fighters[0].x);
       this.combatSystem.resolve(this.fighters);
@@ -132,6 +141,7 @@ export class FightScene extends Phaser.Scene {
       new Fighter(PLAYER_1_START_X),
       new Fighter(PLAYER_2_START_X),
     ];
+    fighters.forEach((fighter) => this.medalSystem.initializeFighter(fighter));
     fighters[0].faceTowards(fighters[1].x);
     fighters[1].faceTowards(fighters[0].x);
     return fighters;
@@ -171,6 +181,29 @@ export class FightScene extends Phaser.Scene {
     }
   }
 
+  private processSwapInput(fighter: Fighter, input: PlayerInput): void {
+    const slot: MedalSlot | null = input.swapHeadPressed
+      ? 'head'
+      : input.swapArmsPressed
+        ? 'arms'
+        : input.swapLegsPressed
+          ? 'legs'
+          : null;
+    if (slot !== null) {
+      this.medalSystem.trySwap(fighter, slot);
+    }
+  }
+
+  private getMedalStatuses(fighter: Fighter): MedalSlotStatus[] {
+    const loadout = this.medalSystem.getLoadout(fighter);
+    const cooldowns = this.medalSystem.getCooldowns(fighter);
+    return (['head', 'arms', 'legs'] as const).map((slot) => ({
+      slot,
+      medalName: this.medalSystem.getMedal(loadout[slot]).name,
+      cooldownFrames: cooldowns[slot],
+    }));
+  }
+
   private updateHud(): void {
     this.hud.updateHealth(this.fighters[0].health, this.fighters[1].health);
     this.hud.updateTimer(this.roundSystem.remainingFrames);
@@ -178,6 +211,10 @@ export class FightScene extends Phaser.Scene {
       this.roundSystem.roundNumber,
       this.roundSystem.player1RoundWins,
       this.roundSystem.player2RoundWins,
+    );
+    this.hud.updateMedals(
+      this.getMedalStatuses(this.fighters[0]),
+      this.getMedalStatuses(this.fighters[1]),
     );
 
     if (this.roundSystem.status === 'playing') {

@@ -30,6 +30,8 @@ export const BLOCK_CHIP_DAMAGE_RATIO = 0.1;
 export const KNOCKBACK_DECAY = 0.8;
 export const KNOCKBACK_STOP_SPEED = 0.1;
 export const ROUND_CONTINUE_KEY = 'ENTER';
+export const SWAP_LOCK_FRAMES = 12;
+export const SWAP_COOLDOWN_FRAMES = 180;
 
 export const HURTBOX_WIDTH = 42;
 export const HURTBOX_HEIGHT = 88;
@@ -45,38 +47,13 @@ export interface AttackDefinition {
   recoveryFrames: number;
   hitstunFrames: number;
   blockstunFrames: number;
+  hitCount: number;
   knockback: number;
   hitboxWidth: number;
   hitboxHeight: number;
   forwardOffset: number;
+  hitboxOffsetY: number;
 }
-
-export const ATTACKS: Record<AttackType, AttackDefinition> = {
-  light: {
-    damage: 60,
-    startupFrames: 6,
-    activeFrames: 3,
-    recoveryFrames: 12,
-    hitstunFrames: 18,
-    blockstunFrames: 8,
-    knockback: 5,
-    hitboxWidth: 44,
-    hitboxHeight: 34,
-    forwardOffset: 38,
-  },
-  heavy: {
-    damage: 120,
-    startupFrames: 12,
-    activeFrames: 4,
-    recoveryFrames: 20,
-    hitstunFrames: 28,
-    blockstunFrames: 12,
-    knockback: 8,
-    hitboxWidth: 64,
-    hitboxHeight: 52,
-    forwardOffset: 46,
-  },
-};
 
 export const HUD_MARGIN = 32;
 export const HUD_HEALTH_BAR_WIDTH = 300;
@@ -87,6 +64,14 @@ export const HUD_TIMER_Y = HUD_HEALTH_BAR_Y;
 export const HUD_SCORE_Y = 66;
 export const HUD_TITLE_Y = 94;
 export const HUD_CONTROLS_Y = 126;
+export const HUD_MEDAL_PANEL_MARGIN = 16;
+export const HUD_MEDAL_PANEL_WIDTH = 430;
+export const HUD_MEDAL_PANEL_HEIGHT = 60;
+export const HUD_MEDAL_PANEL_Y = GAME_HEIGHT - HUD_MEDAL_PANEL_HEIGHT / 2 - 2;
+export const HUD_MEDAL_TEXT_INSET = 8;
+export const HUD_MEDAL_FONT_SIZE = 12;
+export const HUD_MEDAL_PANEL_COLOR = 0x0f172a;
+export const HUD_MEDAL_PANEL_ALPHA = 0.92;
 export const HUD_BACKGROUND_COLOR = 0x334155;
 export const ROUND_OVERLAY_COLOR = 0x020617;
 export const ROUND_OVERLAY_ALPHA = 0.82;
