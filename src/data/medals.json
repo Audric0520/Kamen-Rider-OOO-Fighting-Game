@@ -1,0 +1,165 @@
+[
+  {
+    "id": "taka",
+    "name": "Taka (Hawk)",
+    "slot": "head",
+    "color": "red",
+    "modifiers": { "moveSpeed": 1.0, "jumpPower": 1.0, "damage": 1.0 },
+    "special": {
+      "id": "feather_shot",
+      "damage": 60,
+      "startup": 14,
+      "active": 4,
+      "recovery": 22,
+      "hitstun": 14,
+      "blockstun": 7,
+      "knockback": 3,
+      "projectile": { "speed": 9, "lifetime": 50, "width": 24, "height": 12 }
+    }
+  },
+  {
+    "id": "lion",
+    "name": "Lion",
+    "slot": "head",
+    "color": "yellow",
+    "modifiers": { "moveSpeed": 1.0, "jumpPower": 1.0, "damage": 1.0 },
+    "special": {
+      "id": "lion_flash",
+      "damage": 70,
+      "startup": 10,
+      "active": 2,
+      "recovery": 28,
+      "hitstun": 24,
+      "blockstun": 8,
+      "knockback": 5,
+      "hitbox": { "width": 112, "height": 82, "offsetX": 46, "offsetY": -8 }
+    }
+  },
+  {
+    "id": "kuwagata",
+    "name": "Kuwagata (Stag Beetle)",
+    "slot": "head",
+    "color": "green",
+    "modifiers": { "moveSpeed": 1.0, "jumpPower": 1.0, "damage": 1.0 },
+    "special": {
+      "id": "electric_lunge",
+      "damage": 80,
+      "startup": 10,
+      "active": 5,
+      "recovery": 26,
+      "hitstun": 22,
+      "blockstun": 6,
+      "knockback": 8,
+      "hitbox": { "width": 58, "height": 44, "offsetX": 48, "offsetY": 0 },
+      "lunge": { "speedPerFrame": 8, "durationFrames": 5 }
+    }
+  },
+  {
+    "id": "kujaku",
+    "name": "Kujaku (Peacock)",
+    "slot": "arms",
+    "color": "red",
+    "modifiers": { "moveSpeed": 1.0, "jumpPower": 1.0, "damage": 0.9 },
+    "light": {
+      "damage": 40,
+      "startup": 8,
+      "active": 4,
+      "recovery": 16,
+      "hitstun": 14,
+      "blockstun": 7,
+      "knockback": 3,
+      "hitbox": { "width": 76, "height": 30, "offsetX": 58, "offsetY": -10 }
+    },
+    "heavy": {
+      "damage": 70,
+      "startup": 16,
+      "active": 6,
+      "recovery": 28,
+      "hitstun": 20,
+      "blockstun": 10,
+      "knockback": 4,
+      "hitbox": { "width": 112, "height": 42, "offsetX": 80, "offsetY": -8 }
+    }
+  },
+  {
+    "id": "tora",
+    "name": "Tora (Tiger)",
+    "slot": "arms",
+    "color": "yellow",
+    "modifiers": { "moveSpeed": 1.0, "jumpPower": 1.0, "damage": 1.0 },
+    "light": {
+      "damage": 60,
+      "startup": 6,
+      "active": 3,
+      "recovery": 12,
+      "hitstun": 18,
+      "blockstun": 8,
+      "hitCount": 2,
+      "knockback": 5,
+      "hitbox": { "width": 44, "height": 34, "offsetX": 38, "offsetY": 0 }
+    },
+    "heavy": {
+      "damage": 120,
+      "startup": 12,
+      "active": 4,
+      "recovery": 20,
+      "hitstun": 28,
+      "blockstun": 12,
+      "hitCount": 3,
+      "knockback": 8,
+      "hitbox": { "width": 64, "height": 52, "offsetX": 46, "offsetY": 0 }
+    }
+  },
+  {
+    "id": "kamakiri",
+    "name": "Kamakiri (Mantis)",
+    "slot": "arms",
+    "color": "green",
+    "modifiers": { "moveSpeed": 1.0, "jumpPower": 1.0, "damage": 0.85 },
+    "light": {
+      "damage": 35,
+      "startup": 4,
+      "active": 3,
+      "recovery": 10,
+      "hitstun": 14,
+      "blockstun": 6,
+      "knockback": 3,
+      "hitbox": { "width": 58, "height": 28, "offsetX": 46, "offsetY": 0 }
+    },
+    "heavy": {
+      "damage": 70,
+      "startup": 10,
+      "active": 4,
+      "recovery": 18,
+      "hitstun": 20,
+      "blockstun": 10,
+      "knockback": 5,
+      "hitbox": { "width": 84, "height": 36, "offsetX": 60, "offsetY": 0 }
+    }
+  },
+  {
+    "id": "condor",
+    "name": "Condor",
+    "slot": "legs",
+    "color": "red",
+    "modifiers": { "moveSpeed": 1.0, "jumpPower": 1.0, "damage": 1.0 },
+    "dash": { "speed": 10, "durationFrames": 8, "airborne": true },
+    "glide": { "gravityMultiplier": 0.55 }
+  },
+  {
+    "id": "cheetah",
+    "name": "Cheetah",
+    "slot": "legs",
+    "color": "yellow",
+    "modifiers": { "moveSpeed": 1.2, "jumpPower": 1.0, "damage": 1.0 },
+    "dash": { "speed": 14, "durationFrames": 6, "airborne": false }
+  },
+  {
+    "id": "batta",
+    "name": "Batta (Grasshopper)",
+    "slot": "legs",
+    "color": "green",
+    "modifiers": { "moveSpeed": 1.0, "jumpPower": 1.2, "damage": 1.0 },
+    "doubleJump": { "enabled": true, "jumpPowerMultiplier": 1.0 }
+  }
+]

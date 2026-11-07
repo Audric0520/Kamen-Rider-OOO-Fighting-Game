@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { PLAYER_1_KEYS, PLAYER_2_KEYS } from '../config';
 import type { FighterInput } from '../entities/Fighter';
+import { DirectionTapTracker } from './DirectionTapTracker';
 
 interface PlayerKeyMap {
   left: string;
@@ -41,6 +42,10 @@ export interface PlayerInput extends FighterInput {
 export class InputSystem {
   private readonly player1Keys: BoundPlayerKeys;
   private readonly player2Keys: BoundPlayerKeys;
+  private readonly dashTapTrackers: Record<1 | 2, DirectionTapTracker> = {
+    1: new DirectionTapTracker(),
+    2: new DirectionTapTracker(),
+  };
 
   public constructor(scene: Phaser.Scene) {
     const keyboard = scene.input.keyboard;
@@ -54,6 +59,9 @@ export class InputSystem {
 
   public readPlayerInput(player: 1 | 2): PlayerInput {
     const keys = player === 1 ? this.player1Keys : this.player2Keys;
+    const leftPressed = Phaser.Input.Keyboard.JustDown(keys.left);
+    const rightPressed = Phaser.Input.Keyboard.JustDown(keys.right);
+    const dashDirection = this.dashTapTrackers[player].advance(leftPressed, rightPressed);
 
     return {
       left: keys.left.isDown,
@@ -63,6 +71,7 @@ export class InputSystem {
       lightAttackPressed: Phaser.Input.Keyboard.JustDown(keys.lightAttack),
       heavyAttackPressed: Phaser.Input.Keyboard.JustDown(keys.heavyAttack),
       specialPressed: Phaser.Input.Keyboard.JustDown(keys.special),
+      dashDirection,
       swapHeadPressed: Phaser.Input.Keyboard.JustDown(keys.swapHead),
       swapArmsPressed: Phaser.Input.Keyboard.JustDown(keys.swapArms),
       swapLegsPressed: Phaser.Input.Keyboard.JustDown(keys.swapLegs),

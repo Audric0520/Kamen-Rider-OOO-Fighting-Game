@@ -8,6 +8,14 @@ import {
   HUD_HEALTH_BAR_Y,
   HUD_LABEL_Y,
   HUD_MARGIN,
+  HUD_MEDAL_FONT_SIZE,
+  HUD_MEDAL_PANEL_ALPHA,
+  HUD_MEDAL_PANEL_COLOR,
+  HUD_MEDAL_PANEL_HEIGHT,
+  HUD_MEDAL_PANEL_MARGIN,
+  HUD_MEDAL_PANEL_WIDTH,
+  HUD_MEDAL_PANEL_Y,
+  HUD_MEDAL_TEXT_INSET,
   HUD_SCORE_Y,
   HUD_TIMER_Y,
   MAX_HEALTH,
@@ -25,19 +33,29 @@ import {
   FIXED_UPDATES_PER_SECOND,
 } from '../config';
 
+export interface MedalSlotStatus {
+  slot: 'head' | 'arms' | 'legs';
+  medalName: string;
+  cooldownFrames: number;
+}
+
 /** Match HUD and round-end presentation; match rules stay in RoundSystem. */
 export class Hud {
   private readonly player1Fill: Phaser.GameObjects.Rectangle;
   private readonly player2Fill: Phaser.GameObjects.Rectangle;
   private readonly timerText: Phaser.GameObjects.Text;
   private readonly scoreText: Phaser.GameObjects.Text;
+  private readonly player1MedalsText: Phaser.GameObjects.Text;
+  private readonly player2MedalsText: Phaser.GameObjects.Text;
+  private readonly player2ScoreLabel: string;
   private readonly overlayBackground: Phaser.GameObjects.Rectangle;
   private readonly overlayPanel: Phaser.GameObjects.Rectangle;
   private readonly overlayTitle: Phaser.GameObjects.Text;
   private readonly overlayDetail: Phaser.GameObjects.Text;
   private readonly overlayPrompt: Phaser.GameObjects.Text;
 
-  public constructor(scene: Phaser.Scene) {
+  public constructor(scene: Phaser.Scene, player2Label = 'PLAYER 2') {
+    this.player2ScoreLabel = player2Label === 'CPU' ? 'CPU' : 'P2';
     scene.add.text(HUD_MARGIN, HUD_LABEL_Y, 'PLAYER 1', {
       color: '#f5d0fe',
       fontFamily: 'Arial, sans-serif',
@@ -50,7 +68,7 @@ export class Hud {
       fontSize: '12px',
       fontStyle: 'bold',
     }).setOrigin(0.5, 0);
-    scene.add.text(GAME_WIDTH - HUD_MARGIN, HUD_LABEL_Y, 'PLAYER 2', {
+    scene.add.text(GAME_WIDTH - HUD_MARGIN, HUD_LABEL_Y, player2Label, {
       color: '#a5f3fc',
       fontFamily: 'Arial, sans-serif',
       fontSize: '14px',
@@ -99,6 +117,45 @@ export class Hud {
       fontSize: '15px',
       fontStyle: 'bold',
     }).setOrigin(0.5);
+
+    scene.add.rectangle(
+      HUD_MEDAL_PANEL_MARGIN + HUD_MEDAL_PANEL_WIDTH / 2,
+      HUD_MEDAL_PANEL_Y,
+      HUD_MEDAL_PANEL_WIDTH,
+      HUD_MEDAL_PANEL_HEIGHT,
+      HUD_MEDAL_PANEL_COLOR,
+    ).setAlpha(HUD_MEDAL_PANEL_ALPHA);
+    scene.add.rectangle(
+      GAME_WIDTH - HUD_MEDAL_PANEL_MARGIN - HUD_MEDAL_PANEL_WIDTH / 2,
+      HUD_MEDAL_PANEL_Y,
+      HUD_MEDAL_PANEL_WIDTH,
+      HUD_MEDAL_PANEL_HEIGHT,
+      HUD_MEDAL_PANEL_COLOR,
+    ).setAlpha(HUD_MEDAL_PANEL_ALPHA);
+    const medalTextY = HUD_MEDAL_PANEL_Y - HUD_MEDAL_PANEL_HEIGHT / 2 + HUD_MEDAL_TEXT_INSET;
+    this.player1MedalsText = scene.add.text(
+      HUD_MEDAL_PANEL_MARGIN + HUD_MEDAL_TEXT_INSET,
+      medalTextY,
+      '',
+      {
+        color: '#f5d0fe',
+        fontFamily: 'Arial, sans-serif',
+        fontSize: `${HUD_MEDAL_FONT_SIZE}px`,
+        lineSpacing: 0,
+      },
+    );
+    this.player2MedalsText = scene.add.text(
+      GAME_WIDTH - HUD_MEDAL_PANEL_MARGIN - HUD_MEDAL_TEXT_INSET,
+      medalTextY,
+      '',
+      {
+        color: '#a5f3fc',
+        fontFamily: 'Arial, sans-serif',
+        fontSize: `${HUD_MEDAL_FONT_SIZE}px`,
+        align: 'right',
+        lineSpacing: 0,
+      },
+    ).setOrigin(1, 0);
 
     this.overlayBackground = scene.add.rectangle(
       GAME_WIDTH / 2,
@@ -149,7 +206,17 @@ export class Hud {
   }
 
   public updateScore(roundNumber: number, player1Wins: number, player2Wins: number): void {
-    this.scoreText.setText(`ROUND ${roundNumber}     P1 ${player1Wins} — ${player2Wins} P2`);
+    this.scoreText.setText(`ROUND ${roundNumber}     P1 ${player1Wins} — ${player2Wins} ${this.player2ScoreLabel}`);
+  }
+
+  public updateMedals(
+    player1: readonly MedalSlotStatus[],
+    player2: readonly MedalSlotStatus[],
+    player1SetName: string | null,
+    player2SetName: string | null,
+  ): void {
+    this.player1MedalsText.setText(this.formatMedals(player1, player1SetName));
+    this.player2MedalsText.setText(this.formatMedals(player2, player2SetName));
   }
 
   public showRoundEnd(title: string, detail: string, prompt: string): void {
@@ -169,5 +236,19 @@ export class Hud {
     this.overlayTitle.setVisible(false);
     this.overlayDetail.setVisible(false);
     this.overlayPrompt.setVisible(false);
+  }
+
+  private formatMedals(
+    medals: readonly MedalSlotStatus[],
+    activeSetName: string | null,
+  ): string {
+    const medalLines = medals.map(({ slot, medalName, cooldownFrames }) => {
+      const cooldownLabel = cooldownFrames > 0
+        ? `${Math.ceil(cooldownFrames / FIXED_UPDATES_PER_SECOND)}s`
+        : 'READY';
+      return `${slot.toUpperCase()}  ${medalName}  ${cooldownLabel}`;
+    });
+    medalLines.push(`SET  ${activeSetName ?? 'None'}`);
+    return medalLines.join('\n');
   }
 }

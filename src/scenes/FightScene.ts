@@ -4,49 +4,77 @@ import {
   DEBUG_HITBOX_COLOR,
   DEBUG_HURTBOX_COLOR,
   DEBUG_TOGGLE_KEY,
+  DEFAULT_GAME_MODE,
   FIXED_STEP_MS,
-  FIGHTER_FACING_MARKER_HEIGHT,
-  FIGHTER_FACING_MARKER_INSET,
-  FIGHTER_FACING_MARKER_WIDTH,
   FIGHTER_HEIGHT,
-  FIGHTER_WIDTH,
+  FIGHTER_PLAYER_1_SHEET,
+  FIGHTER_PLAYER_1_TEXTURE,
+  FIGHTER_PLAYER_2_SHEET,
+  FIGHTER_PLAYER_2_TEXTURE,
+  FIGHTER_SPRITE_ANIMATIONS,
+  FIGHTER_SPRITE_FRAME_HEIGHT,
+  FIGHTER_SPRITE_FRAME_WIDTH,
   GAME_HEIGHT,
   GAME_WIDTH,
   GROUND_Y,
   HUD_CONTROLS_Y,
   HUD_TITLE_Y,
-  KO_FIGHTER_COLOR,
+  KO_SPRITE_ALPHA,
   PLAYER_1_START_X,
   PLAYER_2_START_X,
+  PROJECTILE_COLOR,
   ROUND_CONTINUE_KEY,
   STAGE_LEFT,
   STAGE_RIGHT,
+  type GameMode,
 } from '../config';
-import { Fighter, type CombatBox } from '../entities/Fighter';
+import { Fighter, type CombatBox, type FighterInput } from '../entities/Fighter';
+import { Projectile } from '../entities/Projectile';
+import { AISystem } from '../systems/AISystem';
 import { CombatSystem } from '../systems/CombatSystem';
-import { InputSystem } from '../systems/InputSystem';
+import { InputSystem, type PlayerInput } from '../systems/InputSystem';
+import { MedalSystem, type MedalSlot } from '../systems/MedalSystem';
 import { RoundSystem, type RoundWinner } from '../systems/RoundSystem';
-import { Hud } from '../ui/Hud';
+import { Hud, type MedalSlotStatus } from '../ui/Hud';
 
-const FIGHTER_BODY_COLORS: [number, number] = [0xd946ef, 0x0891b2];
-const FIGHTER_MARKER_COLORS: [number, number] = [0xf5d0fe, 0xa5f3fc];
+const FIGHTER_TEXTURES = [FIGHTER_PLAYER_1_TEXTURE, FIGHTER_PLAYER_2_TEXTURE] as const;
 
 export class FightScene extends Phaser.Scene {
   private fighters!: [Fighter, Fighter];
-  private fighterShapes!: [Phaser.GameObjects.Rectangle, Phaser.GameObjects.Rectangle];
-  private facingMarkers!: [Phaser.GameObjects.Rectangle, Phaser.GameObjects.Rectangle];
+  private fighterSprites!: [Phaser.GameObjects.Sprite, Phaser.GameObjects.Sprite];
+  private currentSpriteAnimations: [string | null, string | null] = [null, null];
   private inputSystem!: InputSystem;
+  private aiSystem: AISystem | null = null;
+  private gameMode: GameMode = DEFAULT_GAME_MODE;
   private combatSystem!: CombatSystem;
+  private medalSystem!: MedalSystem;
   private roundSystem!: RoundSystem;
   private hud!: Hud;
   private debugKey!: Phaser.Input.Keyboard.Key;
   private roundContinueKey!: Phaser.Input.Keyboard.Key;
   private debugGraphics!: Phaser.GameObjects.Graphics;
+  private projectiles: Projectile[] = [];
+  private readonly projectileVisuals = new Map<Projectile, Phaser.GameObjects.Ellipse>();
   private accumulator = 0;
   private debugEnabled = false;
 
   public constructor() {
     super('FightScene');
+  }
+
+  public init(data: { mode?: GameMode } = {}): void {
+    this.gameMode = data.mode ?? DEFAULT_GAME_MODE;
+  }
+
+  public preload(): void {
+    this.load.spritesheet(FIGHTER_PLAYER_1_TEXTURE, FIGHTER_PLAYER_1_SHEET, {
+      frameWidth: FIGHTER_SPRITE_FRAME_WIDTH,
+      frameHeight: FIGHTER_SPRITE_FRAME_HEIGHT,
+    });
+    this.load.spritesheet(FIGHTER_PLAYER_2_TEXTURE, FIGHTER_PLAYER_2_SHEET, {
+      frameWidth: FIGHTER_SPRITE_FRAME_WIDTH,
+      frameHeight: FIGHTER_SPRITE_FRAME_HEIGHT,
+    });
   }
 
   public create(): void {
@@ -59,10 +87,13 @@ export class FightScene extends Phaser.Scene {
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
-    this.add.text(GAME_WIDTH / 2, HUD_CONTROLS_Y, 'P1: A / D move, W jump, S block, J / K attack   |   P2: ← / → move, ↑ jump, ↓ block, Numpad 1 / 2', {
+    const controlsText = this.gameMode === 'cpu'
+      ? 'P1: A / D move (double-tap dash), W jump, S block, J / K / L attack, U / I / O swap\nCPU: fights automatically'
+      : 'P1: A / D move (double-tap dash), W jump, S block, J / K / L attack, U / I / O swap\nP2: arrows move (double-tap dash), Down block, Numpad 1 / 2 / 3 attack, 4 / 5 / 6 swap';
+    this.add.text(GAME_WIDTH / 2, HUD_CONTROLS_Y, controlsText, {
       color: '#cbd5e1',
       fontFamily: 'Arial, sans-serif',
-      fontSize: '13px',
+      fontSize: '12px',
     }).setOrigin(0.5);
 
     const stage = this.add.graphics();
@@ -74,16 +105,20 @@ export class FightScene extends Phaser.Scene {
     stage.lineBetween(STAGE_LEFT, GROUND_Y, STAGE_LEFT, GAME_HEIGHT - 42);
     stage.lineBetween(STAGE_RIGHT, GROUND_Y, STAGE_RIGHT, GAME_HEIGHT - 42);
 
+    this.createFighterAnimations();
+    this.currentSpriteAnimations = [null, null];
+    this.medalSystem = new MedalSystem();
+    this.aiSystem = this.gameMode === 'cpu' ? new AISystem() : null;
     this.fighters = this.createFighters();
-    const player1Visual = this.createFighterVisual(this.fighters[0], 0);
-    const player2Visual = this.createFighterVisual(this.fighters[1], 1);
-    this.fighterShapes = [player1Visual[0], player2Visual[0]];
-    this.facingMarkers = [player1Visual[1], player2Visual[1]];
+    this.fighterSprites = [
+      this.createFighterVisual(this.fighters[0], 0),
+      this.createFighterVisual(this.fighters[1], 1),
+    ];
 
     this.inputSystem = new InputSystem(this);
     this.combatSystem = new CombatSystem();
     this.roundSystem = new RoundSystem();
-    this.hud = new Hud(this);
+    this.hud = new Hud(this, this.gameMode === 'cpu' ? 'CPU' : 'PLAYER 2');
 
     const keyboard = this.input.keyboard;
     if (!keyboard) {
@@ -109,12 +144,38 @@ export class FightScene extends Phaser.Scene {
     this.accumulator += delta;
 
     while (this.accumulator >= FIXED_STEP_MS && this.roundSystem.status === 'playing') {
-      this.fighters[0].update(this.inputSystem.readPlayerInput(1));
-      this.fighters[1].update(this.inputSystem.readPlayerInput(2));
+      this.medalSystem.advanceCooldowns(this.fighters[0]);
+      this.medalSystem.advanceCooldowns(this.fighters[1]);
+      const player1Input = this.inputSystem.readPlayerInput(1);
+      const aiDecision = this.aiSystem?.update(
+        this.fighters[0],
+        this.fighters[1],
+        this.medalSystem,
+      ) ?? null;
+      let player2Input: FighterInput;
+      let manualPlayer2Input: PlayerInput | null = null;
+      if (aiDecision) {
+        player2Input = aiDecision.input;
+      } else {
+        manualPlayer2Input = this.inputSystem.readPlayerInput(2);
+        player2Input = manualPlayer2Input;
+      }
+      this.fighters[0].update(player1Input);
+      this.fighters[1].update(player2Input);
+      this.processSwapInput(this.fighters[0], player1Input);
+      if (aiDecision?.swapSlot) {
+        this.medalSystem.trySwap(this.fighters[1], aiDecision.swapSlot);
+      } else if (manualPlayer2Input) {
+        this.processSwapInput(this.fighters[1], manualPlayer2Input);
+      }
       this.fighters[0].faceTowards(this.fighters[1].x);
       this.fighters[1].faceTowards(this.fighters[0].x);
-      this.combatSystem.resolve(this.fighters);
+      this.spawnSpecialProjectiles();
+      this.combatSystem.resolve(this.fighters, this.projectiles);
       this.roundSystem.update(this.fighters[0], this.fighters[1]);
+      if (this.roundSystem.status !== 'playing') {
+        this.clearProjectiles();
+      }
       this.accumulator -= FIXED_STEP_MS;
     }
 
@@ -124,6 +185,7 @@ export class FightScene extends Phaser.Scene {
 
     this.updateHud();
     this.syncFighterVisuals();
+    this.syncProjectileVisuals();
     this.drawDebugOverlay();
   }
 
@@ -132,6 +194,7 @@ export class FightScene extends Phaser.Scene {
       new Fighter(PLAYER_1_START_X),
       new Fighter(PLAYER_2_START_X),
     ];
+    fighters.forEach((fighter) => this.medalSystem.initializeFighter(fighter));
     fighters[0].faceTowards(fighters[1].x);
     fighters[1].faceTowards(fighters[0].x);
     return fighters;
@@ -140,28 +203,41 @@ export class FightScene extends Phaser.Scene {
   private createFighterVisual(
     fighter: Fighter,
     playerIndex: 0 | 1,
-  ): [Phaser.GameObjects.Rectangle, Phaser.GameObjects.Rectangle] {
-    const body = this.add.rectangle(
+  ): Phaser.GameObjects.Sprite {
+    // Sprite dimensions are visual-only; Fighter retains its own hurtbox and attack data.
+    const sprite = this.add.sprite(
       fighter.x,
-      fighter.y + FIGHTER_HEIGHT / 2,
-      FIGHTER_WIDTH,
-      FIGHTER_HEIGHT,
-      FIGHTER_BODY_COLORS[playerIndex],
+      fighter.y + FIGHTER_HEIGHT,
+      FIGHTER_TEXTURES[playerIndex],
+      0,
     );
-    body.setStrokeStyle(3, FIGHTER_MARKER_COLORS[playerIndex]);
+    sprite.setOrigin(0.5, 1);
+    sprite.setFlipX(fighter.facing === -1);
+    sprite.setDepth(2);
+    return sprite;
+  }
 
-    const facingMarker = this.add.rectangle(
-      fighter.x,
-      fighter.y + FIGHTER_HEIGHT / 3,
-      FIGHTER_FACING_MARKER_WIDTH,
-      FIGHTER_FACING_MARKER_HEIGHT,
-      FIGHTER_MARKER_COLORS[playerIndex],
-    );
-
-    return [body, facingMarker];
+  private createFighterAnimations(): void {
+    for (const textureKey of FIGHTER_TEXTURES) {
+      for (const [state, definition] of Object.entries(FIGHTER_SPRITE_ANIMATIONS)) {
+        const key = `${textureKey}-${state.toLowerCase()}`;
+        if (this.anims.exists(key)) {
+          continue;
+        }
+        this.anims.create({
+          key,
+          frames: this.anims.generateFrameNumbers(textureKey, {
+            frames: [...definition.frames],
+          }),
+          frameRate: definition.frameRate,
+          repeat: definition.repeat,
+        });
+      }
+    }
   }
 
   private continueAfterRound(): void {
+    this.clearProjectiles();
     if (this.roundSystem.status === 'round-end') {
       this.roundSystem.startNextRound();
       this.fighters = this.createFighters();
@@ -169,6 +245,74 @@ export class FightScene extends Phaser.Scene {
       this.roundSystem.restartMatch();
       this.fighters = this.createFighters();
     }
+    this.aiSystem?.reset();
+  }
+
+  private processSwapInput(fighter: Fighter, input: PlayerInput): void {
+    const slot: MedalSlot | null = input.swapHeadPressed
+      ? 'head'
+      : input.swapArmsPressed
+        ? 'arms'
+        : input.swapLegsPressed
+          ? 'legs'
+          : null;
+    if (slot !== null) {
+      this.medalSystem.trySwap(fighter, slot);
+    }
+  }
+
+  private getMedalStatuses(fighter: Fighter): MedalSlotStatus[] {
+    const loadout = this.medalSystem.getLoadout(fighter);
+    const cooldowns = this.medalSystem.getCooldowns(fighter);
+    return (['head', 'arms', 'legs'] as const).map((slot) => ({
+      slot,
+      medalName: this.medalSystem.getMedal(loadout[slot]).name,
+      cooldownFrames: cooldowns[slot],
+    }));
+  }
+
+  private spawnSpecialProjectiles(): void {
+    for (const fighter of this.fighters) {
+      const request = fighter.consumeSpecialProjectile();
+      if (request) {
+        this.projectiles.push(new Projectile(fighter, request));
+      }
+    }
+  }
+
+  private syncProjectileVisuals(): void {
+    const activeProjectiles = this.projectiles.filter((projectile) => projectile.active);
+    const activeSet = new Set(activeProjectiles);
+    for (const [projectile, visual] of this.projectileVisuals) {
+      if (!activeSet.has(projectile)) {
+        visual.destroy();
+        this.projectileVisuals.delete(projectile);
+      }
+    }
+
+    for (const projectile of activeProjectiles) {
+      let visual = this.projectileVisuals.get(projectile);
+      if (!visual) {
+        visual = this.add.ellipse(
+          projectile.x,
+          projectile.y,
+          projectile.width,
+          projectile.height,
+          PROJECTILE_COLOR,
+        );
+        this.projectileVisuals.set(projectile, visual);
+      }
+      visual.setPosition(projectile.x, projectile.y);
+    }
+    this.projectiles = activeProjectiles;
+  }
+
+  private clearProjectiles(): void {
+    for (const visual of this.projectileVisuals.values()) {
+      visual.destroy();
+    }
+    this.projectileVisuals.clear();
+    this.projectiles = [];
   }
 
   private updateHud(): void {
@@ -179,13 +323,20 @@ export class FightScene extends Phaser.Scene {
       this.roundSystem.player1RoundWins,
       this.roundSystem.player2RoundWins,
     );
+    this.hud.updateMedals(
+      this.getMedalStatuses(this.fighters[0]),
+      this.getMedalStatuses(this.fighters[1]),
+      this.medalSystem.getActiveSetBonus(this.fighters[0])?.name ?? null,
+      this.medalSystem.getActiveSetBonus(this.fighters[1])?.name ?? null,
+    );
 
     if (this.roundSystem.status === 'playing') {
       this.hud.hideRoundEnd();
       return;
     }
 
-    const score = `P1 ${this.roundSystem.player1RoundWins} — ${this.roundSystem.player2RoundWins} P2`;
+    const opponentScoreLabel = this.gameMode === 'cpu' ? 'CPU' : 'P2';
+    const score = `P1 ${this.roundSystem.player1RoundWins} — ${this.roundSystem.player2RoundWins} ${opponentScoreLabel}`;
     if (this.roundSystem.status === 'round-end') {
       this.hud.showRoundEnd(
         this.roundTitle(this.roundSystem.roundWinner, this.roundSystem.roundNumber),
@@ -195,9 +346,12 @@ export class FightScene extends Phaser.Scene {
       return;
     }
 
+    const matchWinnerLabel = this.gameMode === 'cpu' && this.roundSystem.matchWinner === 2
+      ? 'CPU'
+      : `PLAYER ${this.roundSystem.matchWinner}`;
     const matchTitle = this.roundSystem.matchWinner === 'draw'
       ? 'MATCH DRAW'
-      : `PLAYER ${this.roundSystem.matchWinner} WINS THE MATCH`;
+      : `${matchWinnerLabel} WINS THE MATCH`;
     this.hud.showRoundEnd(
       matchTitle,
       `Final score: ${score}`,
@@ -209,26 +363,24 @@ export class FightScene extends Phaser.Scene {
     if (winner === 'draw' || winner === null) {
       return `ROUND ${roundNumber} DRAW`;
     }
-    return `PLAYER ${winner} WINS ROUND ${roundNumber}`;
+    const winnerLabel = this.gameMode === 'cpu' && winner === 2
+      ? 'CPU'
+      : `PLAYER ${winner}`;
+    return `${winnerLabel} WINS ROUND ${roundNumber}`;
   }
 
   private syncFighterVisuals(): void {
     this.fighters.forEach((fighter, index) => {
-      this.fighterShapes[index].setPosition(
-        fighter.x,
-        fighter.y + FIGHTER_HEIGHT / 2,
-      );
-      this.fighterShapes[index].setFillStyle(
-        fighter.state === 'KO' ? KO_FIGHTER_COLOR : FIGHTER_BODY_COLORS[index],
-      );
-      this.facingMarkers[index].setPosition(
-        fighter.x + fighter.facing * (
-          FIGHTER_WIDTH / 2
-          - FIGHTER_FACING_MARKER_INSET
-          - FIGHTER_FACING_MARKER_WIDTH / 2
-        ),
-        fighter.y + FIGHTER_HEIGHT / 3,
-      );
+      const sprite = this.fighterSprites[index];
+      sprite.setPosition(fighter.x, fighter.y + FIGHTER_HEIGHT);
+      sprite.setFlipX(fighter.facing === -1);
+      sprite.setAlpha(fighter.state === 'KO' ? KO_SPRITE_ALPHA : 1);
+
+      const animationKey = `${FIGHTER_TEXTURES[index]}-${fighter.state.toLowerCase()}`;
+      if (this.currentSpriteAnimations[index] !== animationKey) {
+        sprite.play(animationKey, true);
+        this.currentSpriteAnimations[index] = animationKey;
+      }
     });
   }
 
@@ -244,6 +396,9 @@ export class FightScene extends Phaser.Scene {
       if (attackHitbox) {
         this.drawDebugBox(attackHitbox, DEBUG_HITBOX_COLOR);
       }
+    });
+    this.projectiles.forEach((projectile) => {
+      this.drawDebugBox(projectile.getHitbox(), DEBUG_HITBOX_COLOR);
     });
   }
 
