@@ -24,6 +24,12 @@ import {
   PLAYER_2_START_X,
   PROJECTILE_COLOR,
   ROUND_CONTINUE_KEY,
+  SCREEN_SHAKE_BLOCK_FRAMES,
+  SCREEN_SHAKE_BLOCK_INTENSITY,
+  SCREEN_SHAKE_HIT_FRAMES,
+  SCREEN_SHAKE_HIT_INTENSITY,
+  SCREEN_SHAKE_KO_FRAMES,
+  SCREEN_SHAKE_KO_INTENSITY,
   STAGE_LEFT,
   STAGE_RIGHT,
   type GameMode,
@@ -35,6 +41,7 @@ import { CombatSystem } from '../systems/CombatSystem';
 import { InputSystem, type PlayerInput } from '../systems/InputSystem';
 import { MedalSystem, type MedalSlot } from '../systems/MedalSystem';
 import { RoundSystem, type RoundWinner } from '../systems/RoundSystem';
+import { SoundSystem } from '../systems/SoundSystem';
 import { Hud, type MedalSlotStatus } from '../ui/Hud';
 
 const FIGHTER_TEXTURES = [FIGHTER_PLAYER_1_TEXTURE, FIGHTER_PLAYER_2_TEXTURE] as const;
@@ -50,6 +57,7 @@ export class FightScene extends Phaser.Scene {
   private medalSystem!: MedalSystem;
   private roundSystem!: RoundSystem;
   private hud!: Hud;
+  private soundSystem!: SoundSystem;
   private debugKey!: Phaser.Input.Keyboard.Key;
   private roundContinueKey!: Phaser.Input.Keyboard.Key;
   private debugGraphics!: Phaser.GameObjects.Graphics;
@@ -119,6 +127,7 @@ export class FightScene extends Phaser.Scene {
     this.combatSystem = new CombatSystem();
     this.roundSystem = new RoundSystem();
     this.hud = new Hud(this, this.gameMode === 'cpu' ? 'CPU' : 'PLAYER 2');
+    this.soundSystem = new SoundSystem();
 
     const keyboard = this.input.keyboard;
     if (!keyboard) {
@@ -138,6 +147,7 @@ export class FightScene extends Phaser.Scene {
 
     const continuePressed = Phaser.Input.Keyboard.JustDown(this.roundContinueKey);
     if (continuePressed && this.roundSystem.status !== 'playing') {
+      this.soundSystem.play('confirm');
       this.continueAfterRound();
     }
 
@@ -160,18 +170,34 @@ export class FightScene extends Phaser.Scene {
         manualPlayer2Input = this.inputSystem.readPlayerInput(2);
         player2Input = manualPlayer2Input;
       }
+      const statesBefore: [Fighter['state'], Fighter['state']] = [
+        this.fighters[0].state,
+        this.fighters[1].state,
+      ];
+      const groundedBefore: [boolean, boolean] = [
+        this.fighters[0].grounded,
+        this.fighters[1].grounded,
+      ];
       this.fighters[0].update(player1Input);
       this.fighters[1].update(player2Input);
-      this.processSwapInput(this.fighters[0], player1Input);
+      this.playActionSound(player1Input, statesBefore[0], groundedBefore[0], this.fighters[0]);
+      this.playActionSound(player2Input, statesBefore[1], groundedBefore[1], this.fighters[1]);
+
+      const player1Swapped = this.processSwapInput(this.fighters[0], player1Input);
+      let player2Swapped = false;
       if (aiDecision?.swapSlot) {
-        this.medalSystem.trySwap(this.fighters[1], aiDecision.swapSlot);
+        player2Swapped = this.medalSystem.trySwap(this.fighters[1], aiDecision.swapSlot);
       } else if (manualPlayer2Input) {
-        this.processSwapInput(this.fighters[1], manualPlayer2Input);
+        player2Swapped = this.processSwapInput(this.fighters[1], manualPlayer2Input);
       }
+      if (player1Swapped || player2Swapped) {
+        this.soundSystem.play('swap');
+      }
+
       this.fighters[0].faceTowards(this.fighters[1].x);
       this.fighters[1].faceTowards(this.fighters[0].x);
       this.spawnSpecialProjectiles();
-      this.combatSystem.resolve(this.fighters, this.projectiles);
+      this.resolveCombatFeedback();
       this.roundSystem.update(this.fighters[0], this.fighters[1]);
       if (this.roundSystem.status !== 'playing') {
         this.clearProjectiles();
@@ -248,7 +274,69 @@ export class FightScene extends Phaser.Scene {
     this.aiSystem?.reset();
   }
 
-  private processSwapInput(fighter: Fighter, input: PlayerInput): void {
+  private playActionSound(
+    input: FighterInput,
+    stateBefore: Fighter['state'],
+    groundedBefore: boolean,
+    fighter: Fighter,
+  ): void {
+    if (stateBefore !== 'ATTACK' && fighter.state === 'ATTACK') {
+      if (input.specialPressed) {
+        this.soundSystem.play('special');
+      } else if (input.heavyAttackPressed) {
+        this.soundSystem.play('heavyAttack');
+      } else if (input.lightAttackPressed) {
+        this.soundSystem.play('lightAttack');
+      }
+    }
+
+    if (groundedBefore && !fighter.grounded && input.jumpPressed) {
+      this.soundSystem.play('jump');
+    }
+  }
+
+  private resolveCombatFeedback(): void {
+    const healthBefore: [number, number] = [this.fighters[0].health, this.fighters[1].health];
+    this.combatSystem.resolve(this.fighters, this.projectiles);
+
+    let landedHit = false;
+    let blockedHit = false;
+    let knockout = false;
+    this.fighters.forEach((fighter, index) => {
+      if (fighter.health >= healthBefore[index]) {
+        return;
+      }
+
+      if (fighter.state === 'BLOCK') {
+        blockedHit = true;
+        this.soundSystem.play('block');
+      } else {
+        landedHit = true;
+        this.soundSystem.play('hit');
+      }
+      knockout ||= fighter.state === 'KO';
+    });
+
+    if (knockout) {
+      this.soundSystem.play('ko');
+      this.cameras.main.shake(
+        SCREEN_SHAKE_KO_FRAMES * FIXED_STEP_MS,
+        SCREEN_SHAKE_KO_INTENSITY,
+      );
+    } else if (landedHit) {
+      this.cameras.main.shake(
+        SCREEN_SHAKE_HIT_FRAMES * FIXED_STEP_MS,
+        SCREEN_SHAKE_HIT_INTENSITY,
+      );
+    } else if (blockedHit) {
+      this.cameras.main.shake(
+        SCREEN_SHAKE_BLOCK_FRAMES * FIXED_STEP_MS,
+        SCREEN_SHAKE_BLOCK_INTENSITY,
+      );
+    }
+  }
+
+  private processSwapInput(fighter: Fighter, input: PlayerInput): boolean {
     const slot: MedalSlot | null = input.swapHeadPressed
       ? 'head'
       : input.swapArmsPressed
@@ -256,9 +344,7 @@ export class FightScene extends Phaser.Scene {
         : input.swapLegsPressed
           ? 'legs'
           : null;
-    if (slot !== null) {
-      this.medalSystem.trySwap(fighter, slot);
-    }
+    return slot !== null && this.medalSystem.trySwap(fighter, slot);
   }
 
   private getMedalStatuses(fighter: Fighter): MedalSlotStatus[] {

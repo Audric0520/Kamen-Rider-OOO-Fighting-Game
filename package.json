@@ -9,6 +9,7 @@
     "test:slice7": "node scripts/slice7-smoke.mjs",
     "test:slice8": "node scripts/slice8-ai-smoke.mjs",
     "test:slice9": "node scripts/slice9-sprite-smoke.mjs",
+    "test:slice10": "node scripts/slice10-polish-smoke.mjs",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
