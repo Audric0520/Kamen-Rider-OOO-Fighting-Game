@@ -6,6 +6,9 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
+    "test:slice7": "node scripts/slice7-smoke.mjs",
+    "test:slice8": "node scripts/slice8-ai-smoke.mjs",
+    "test:slice9": "node scripts/slice9-sprite-smoke.mjs",
     "preview": "vite preview --host 0.0.0.0"
   },
   "dependencies": {

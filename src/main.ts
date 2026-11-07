@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { FIXED_UPDATES_PER_SECOND, GAME_HEIGHT, GAME_WIDTH } from './config';
 import { BootScene } from './scenes/BootScene';
 import { FightScene } from './scenes/FightScene';
+import { MenuScene } from './scenes/MenuScene';
 
 new Phaser.Game({
   type: Phaser.AUTO,
@@ -14,12 +15,12 @@ new Phaser.Game({
     forceSetTimeOut: true,
   },
   render: {
-    antialias: true,
-    pixelArt: false,
+    antialias: false,
+    pixelArt: true,
   },
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,
   },
-  scene: [BootScene, FightScene],
+  scene: [BootScene, MenuScene, FightScene],
 });
