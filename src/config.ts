@@ -47,6 +47,58 @@ export const MENU_SUBTITLE_Y = 176;
 export const MENU_OPTIONS_START_Y = 280;
 export const MENU_OPTION_SPACING = 58;
 export const MENU_HELP_Y = 408;
+export const MENU_FIGHTER_Y = 366;
+export const MENU_PANEL_WIDTH = 360;
+export const MENU_PANEL_HEIGHT = 190;
+export const MENU_PANEL_Y = 294;
+export const MENU_BACKGROUND_COLOR = 0x111827;
+export const MENU_ACCENT_COLOR = 0xfbbf24;
+export const MENU_P1_COLOR = 0xef4444;
+export const MENU_P2_COLOR = 0x06b6d4;
+export const SCREEN_SHAKE_HIT_FRAMES = 8;
+export const SCREEN_SHAKE_HIT_INTENSITY = 0.01;
+export const SCREEN_SHAKE_BLOCK_FRAMES = 4;
+export const SCREEN_SHAKE_BLOCK_INTENSITY = 0.006;
+export const SCREEN_SHAKE_KO_FRAMES = 12;
+export const SCREEN_SHAKE_KO_INTENSITY = 0.02;
+export const SOUND_EFFECT_MASTER_VOLUME = 0.12;
+export const SOUND_EFFECT_ENVELOPE_ATTACK_FRAMES = 1;
+
+export type SoundEffectToneDefinition = {
+  frequencyHz: number;
+  durationFrames: number;
+  waveform: 'square' | 'triangle' | 'sawtooth' | 'sine';
+  volume: number;
+};
+
+export const SOUND_EFFECTS = {
+  menuMove: [{ frequencyHz: 660, durationFrames: 3, waveform: 'square', volume: 0.45 }],
+  confirm: [
+    { frequencyHz: 660, durationFrames: 4, waveform: 'square', volume: 0.55 },
+    { frequencyHz: 880, durationFrames: 6, waveform: 'square', volume: 0.55 },
+  ],
+  jump: [{ frequencyHz: 420, durationFrames: 5, waveform: 'triangle', volume: 0.5 }],
+  lightAttack: [{ frequencyHz: 190, durationFrames: 4, waveform: 'sawtooth', volume: 0.45 }],
+  heavyAttack: [{ frequencyHz: 130, durationFrames: 7, waveform: 'sawtooth', volume: 0.55 }],
+  special: [
+    { frequencyHz: 440, durationFrames: 4, waveform: 'square', volume: 0.45 },
+    { frequencyHz: 660, durationFrames: 4, waveform: 'square', volume: 0.5 },
+    { frequencyHz: 990, durationFrames: 7, waveform: 'square', volume: 0.55 },
+  ],
+  hit: [{ frequencyHz: 105, durationFrames: 4, waveform: 'square', volume: 0.65 }],
+  block: [{ frequencyHz: 260, durationFrames: 5, waveform: 'triangle', volume: 0.5 }],
+  swap: [
+    { frequencyHz: 392, durationFrames: 4, waveform: 'square', volume: 0.4 },
+    { frequencyHz: 587, durationFrames: 5, waveform: 'square', volume: 0.5 },
+  ],
+  ko: [
+    { frequencyHz: 392, durationFrames: 5, waveform: 'triangle', volume: 0.55 },
+    { frequencyHz: 294, durationFrames: 7, waveform: 'triangle', volume: 0.5 },
+    { frequencyHz: 196, durationFrames: 10, waveform: 'triangle', volume: 0.5 },
+  ],
+} satisfies Record<string, readonly SoundEffectToneDefinition[]>;
+
+export type SoundEffectName = keyof typeof SOUND_EFFECTS;
 export const AI_DECISION_INTERVAL_FRAMES = 6;
 export const AI_BLOCK_CHANCE = 0.25;
 export const AI_BLOCK_ATTEMPT_COOLDOWN_FRAMES = 45;
